@@ -1,0 +1,334 @@
+---
+title: "HOMEWORK"
+author: "SADIKOV IBROKHIM"
+date: "September 6, 2019"
+output:
+  word_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+library(tidyr)
+library(dplyr)
+library(randomForest)
+library(caret)
+```
+
+#3.	Read the file: data <- read.csv("election_campaign_data.csv", sep=",", header=T, strip.white = T, na.strings = c("NA","NaN","","?")) 
+
+```{r}
+data <- read.csv("election_campaign_data.csv", sep=",", header=T, strip.white = T, na.strings = c("NA","NaN","","?")) 
+```
+
+#4.	Drop the following variables from the data: "cand_id", "last_name", "first_name", "twitterbirth", "facebookdate", "facebookjan", "youtubebirth".
+```{r pressure, echo=FALSE}
+data <- data %>%
+select (-c(cand_id, last_name, first_name, twitterbirth, facebookdate, facebookjan, youtubebirth))
+
+
+#5.	Convert the following variables into factor variables using function as.factor(): “twitter”, “facebook”, “youtube”, “cand_ici”, and “gen_election”.
+
+data$twitter<-as.factor(data$twitter)
+data$facebook<-as.factor(data$facebook)
+data$youtube<-as.factor(data$youtube)
+data$cand_ici<-as.factor(data$cand_ici)
+data$gen_election<-as.factor(data$gen_election)
+
+#7.	Remove all of the observations with any missing values.
+data <- data %>% 
+  drop_na()
+```
+
+#8.	Randomly assign 70% of the observations to train_data and the remaining observations to test_data. 
+
+
+```{r }
+## 70% of the sample size
+smp_size <- floor(0.70 * nrow(data))
+
+## set the seed to make our partition reproducible
+set.seed(123)
+train_ind <- sample(seq_len(nrow(data)), size = smp_size)
+
+train <- data[train_ind, ]
+test <- data[-train_ind, ]
+
+```
+
+#Use train_data to build a random forest classifier with 10 trees. 
+```{r}
+rf10<-randomForest(formula=gen_election~., data=train, ntree=10, importance=T, proximity=T, na.action=na.exclude)
+print(rf10)
+```
+##What is the OOB estimate of error rate? **7.3%**
+##How many variables R tried at each split? **5**
+
+#9.5.	(2 points) Increase the number of trees in 10 increments (e.g. 40, 50, …). 
+```{r}
+rf20<-randomForest(formula=gen_election~., data=train, ntree=20, importance=T, proximity=T, na.action=na.exclude)
+print(rf20)
+```
+##What is the OOB estimate of error rate? **7.23%**
+##How many variables R tried at each split? **5**
+
+```{r}
+rf30<-randomForest(formula=gen_election~., data=train, ntree=30, importance=T, proximity=T, na.action=na.exclude)
+print(rf30)
+```
+##What is the OOB estimate of error rate? **6.92%**
+##How many variables R tried at each split? **5**
+```{r}
+rf40<-randomForest(formula=gen_election~., data=train, ntree=40, importance=T, proximity=T, na.action=na.exclude)
+print(rf40)
+```
+
+##What is the OOB estimate of error rate? **6%**
+##How many variables R tried at each split? **5**
+
+
+```{r}
+rf50<-randomForest(formula=gen_election~., data=train, ntree=50, importance=T, proximity=T, na.action=na.exclude)
+print(rf50)
+```
+
+##Using OOB error rate to evaluate your random forest classifier, how many trees would you recommend? **50 TREES**
+
+#9.6.	(2 points) Determine the best value for mtry (use the number of trees you recommended in 9.5). 
+```{r}
+bestmtry <- tuneRF(train[-26], train$gen_election, stepFactor=1.5, improve=0.01, ntreeTry=50, trace=T, plot=T)
+print(bestmtry)
+
+```
+##What is the recommended value for mtry? **5**
+
+#9.7.	(2 points)  Use your recommended number of trees and mtry value to build a new random forest classifier using train_data. 
+```{r}
+rf <-randomForest(gen_election~., data=train, mtry=5, importance=TRUE, ntree=50)
+print(rf)
+
+```
+##What is OOB estimate of error rate? **5.54%**
+
+#9.8.	(8 points) Use library(caret)  to create the confusion matrix for test_data. Fill out the confusion matrix in below. Use “W” as the value of option positive in confusionMatrix() function. Here is the code from class example in “R_model_evaluation.html”:
+```{r}
+library(e1071)
+library(caret)
+predicted_values <- predict(rf, test,type= "prob")
+threshold <- 0.5
+pred <- factor( ifelse(predicted_values[,2] > threshold, 1, 0) )
+levels(test$gen_election)[2]
+
+
+
+
+
+
+```
+
+```{r}
+levels(test$gen_election) <- list("0" = "L", "1" = "W")
+
+str(pred)
+str(test$gen_election)
+
+
+
+```
+
+```{r}
+confusionMatrix(pred, test$gen_election, 
+                positive = levels(test$gen_election)[2])
+
+```
+```{r}
+library(imager)
+
+im <- load.image("C:/Users/Ibragim/Desktop/homework/Capture1.png")
+plot(im)
+```
+
+
+
+##What is the value of accuracy? **0.93**
+##	What is the value of TPR? **0.91**
+##What is the value of FPR? **0.9517**
+
+#9.9.	(4 points) Use the code in “R_model_evaluation.html” to calculate AUC and create the ROC curve. 
+
+```{r}
+library(ROCR)
+library(ggplot2)
+
+predicted_values_roc_rf <- predict(rf, test,type = "prob")[,2] 
+pred_roc_rf <- prediction(predicted_values_roc_rf, test$gen_election)
+perf_rf <- performance(pred_roc_rf, measure = "tpr", x.measure = "fpr")
+auc <- performance(pred_roc_rf, measure = "auc")
+auc <- auc@y.values[[1]]
+                
+
+
+
+
+
+```
+
+
+```{r}
+roc.data <- data.frame(fpr=unlist(perf_rf@x.values),                       tpr=unlist(perf_rf@y.values), model="RF")
+
+
+```
+
+```{r}
+ggplot(roc.data, aes(x=fpr, ymin=0, ymax=tpr)) +  geom_ribbon(alpha=0.2) +  geom_line(aes(y=tpr)) +  ggtitle(paste0("ROC Curve w/ AUC=", auc))
+
+```
+
+##What is the value of AUC? **0.98**
+##Paste the ROC curve in the space below: **as u can see above picture shows**
+
+#9.10.	(4 points) Use varImpPlot() to create the plot for variable importance. What are the type five important variables when we use MeanDecreaseAccuracy?
+
+```{r}
+
+varImpPlot(rf)
+```
+
+##What are the type five important variables when we use MeanDecreaseAccuracy? **facebook, coh_cop, opp_fund, other_pol_cmte_contrib, cand_ici **
+```{r}
+#in case the obove plot is not clearly seen
+library(imager)
+im <- load.image("C:/Users/Ibragim/Desktop/homework/Capture3.png")
+plot(im)
+```
+
+```{r}
+importance(rf)
+```
+
+```{r}
+library(nnet)
+ann <- nnet(gen_election~ ., data=train, size=5, maxit=1000)
+summary(ann)
+```
+
+##How many input nodes are in the ANN? **39 nodes** 
+##How many weights are in the ANN? **206**
+
+
+#9.10.	(4 points) Use varImpPlot() to create the plot for variable importance. What are the type five important variables when we use MeanDecreaseAccuracy?
+```{r}
+predicted_values_ann <- predict(ann, test,type= "raw")
+head(predicted_values_ann)
+```
+
+```{r}
+threshold <- 0.5 
+pred_ann <- factor( ifelse(predicted_values_ann[,1] > threshold, 1, 0) ) # We ask R to use the threshold and convert the probabilities to class labels (zero and one)
+head(pred_ann) # Let's look at the predicted class labels
+```
+
+```{r}
+levels(test$gen_election)[2]
+```
+#10.1.3.	Use library(caret) to create the confusion matrix for test_data. Fill out the confusion matrix in below. Use “W” as the value of option positive in confusionMatrix() function.
+```{r}
+ pred_ann <- relevel(pred_ann, 1)   
+confusionMatrix(pred_ann, test$gen_election, 
+                positive = levels(test$gen_election)[2]) # Creates the confusion matrix. It is important to determine positive in this function. The option positive sets the 1s as class positive.
+```
+
+```{r}
+library(imager)
+
+im <- load.image("C:/Users/Ibragim/Desktop/homework/Capture2.png")
+plot(im)
+```
+
+##10.1.4.	What is the value of sensitivity? **0.87**
+###10.1.5.	What is the value of specificity? **0.86**
+
+
+#10.1.6.	Use the code in “R_model_evaluation.html” to calculate AUC and create the ROC curve. 
+#10.1.6.1.	What is the value of AUC? ***AUC=0.89*
+#10.1.6.2.	Paste the ROC curve in the space below:
+```{r}
+predicted_values_ANN <- predict(ann, test,type= "raw")
+pred_ANN <- prediction(predicted_values_ANN, test$gen_election)
+perf <- performance(pred_ANN, measure = "tpr", x.measure = "fpr")
+
+auc <- performance(pred_ANN, measure = "auc")
+auc <- auc@y.values[[1]]
+roc.data <- data.frame(fpr=unlist(perf@x.values),
+                       tpr=unlist(perf@y.values),
+                       model="ANN")
+ggplot(roc.data, aes(x=fpr, ymin=0, ymax=tpr)) +
+  geom_ribbon(alpha=0.2) +
+  geom_line(aes(y=tpr)) +
+  ggtitle(paste0("ROC Curve w/ AUC=", auc))
+```
+
+#10.2.	(6 points) Increase the number of hidden nodes until you get the following error: “Error in nnet.default(x, y, w, entropy = TRUE, ...): too many (1026) weights.” Use the maximum number of hidden nodes that you can use to build your ANN classifier. 
+
+
+```{r}
+#ann_2 <- nnet(gen_election ~ ., data=train, size=25, maxit=1000) using this gave the following error which means 25 is not applicable
+#Error in nnet.default(x, y, w, entropy = TRUE, ...) : too many (1026) weights
+```
+##10.2.1.	What is the maximum number of hidden nodes that we could use? **Max # 24**
+
+```{r}
+ann_3 <- nnet(gen_election ~ ., data=train, size=24, maxit=1000)
+```
+
+#10.2.2.	Use the code in “R_model_evaluation.html” to calculate AUC and create the ROC curve. 
+
+##10.2.2.1.	What is the value of AUC? **AUC=0.96**
+##10.2.2.2.	Paste the ROC curve in the space below
+```{r}
+predicted_values_ANN3 <- predict(ann_3, test,type= "raw")
+pred_ANN3 <- prediction(predicted_values_ANN3, test$gen_election)
+perf <- performance(pred_ANN3, measure = "tpr", x.measure = "fpr")
+
+auc <- performance(pred_ANN3, measure = "auc")
+auc <- auc@y.values[[1]]
+roc.data <- data.frame(fpr=unlist(perf@x.values),
+                       tpr=unlist(perf@y.values),
+                       model="ANN")
+ggplot(roc.data, aes(x=fpr, ymin=0, ymax=tpr)) +
+  geom_ribbon(alpha=0.2) +
+  geom_line(aes(y=tpr)) +
+  ggtitle(paste0("ROC Curve w/ AUC=", auc))
+
+
+```
+
+11.	(5 points) Among the three classifiers that you built, which classifier would you finally use for predicting the election’s outcome? Please explain.
+
+**Accuracy and AUC values of Random forest are considerably  higher  compared to other  models.Thus, I use Random Forest Classifier to predict the elections outcome.**
+
+12.	(10 points) The buzz from the 2008 election motivated the candidates for political offices to employ social media campaigns to get their message across. Imagine that you are an advisor to a candidate who is running for a Congressional seat. Based on your analysis, would you recommend sparing money and resources to create social media campaigns? If so, among the three social media platforms (Facebook, Twitter, and YouTube), which platform would you recommend to invest in? Please explain. 
+
+**As an advisor I would suggest the candidate to leverage social media compaigns. And therefore, I would advise to allocate funds or incerease presense for that purposes. As we look at variable importance plot Facebook has much higer MeanDecreaseAccuracy and therefore it would be dominant media platform** 
+
+13.	(10 points) Given your analysis, would you agree with this statement: “Money Buys Political Power”? Please explain. 
+
+**Again reffering to variable importance plot, we can somehow assume that the answer for this question is yes, since most of them are attributes related to money. On the other hand, our models does not show the direction of the impact of these variables whether it is positive or negative as we used to see in linear models like Regression. As the models we used are non parametric we cant exectly say that our attributes have some kind of negative or positively impacting on winning or losing. We only know the significance of classification.**
+
+
+14.	(10 points) Imagine that you are an advisor to a candidate who is running for a Congressional seat. Based on your analysis, what are your prescriptions for success for your candidate? Please explain.
+
+**From the variable importance plot using MeanGiniIndex and MeanDecreaseAccuracy we can observe that top most important variables are  Contributions from Other Political Committees , facebook,  Beginning cash , Ending cash .From there we can anticipate that most of the important variables are related to financials and social media presense. Hence I would suggest that paying particular attention to this attributes will definetely impact their winning or losing outcome.**
+
+
+15.	(5 points) Please paste your R code in the space below: **I usaed R Markdown for this assignment which includes the code too**
+
+
+
+
+
+
+
+
+
+
